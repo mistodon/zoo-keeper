@@ -25,11 +25,9 @@ class Game
 class GameState extends State
   constructor: ->
     super()
-    @frames = 0
   
   draw: ->
     #Do nothing
   
   tick: ->
-    log("Game ticking...")
     
