@@ -1,3 +1,15 @@
+all = (bools) ->
+  if bools.length is 0
+    return true
+  else
+    return bools[0] and all bools[1..]
+
+any = (bools) ->
+  if bools.length is 0
+    return false
+  else
+    return bools[0] or any bools[1..]
+
 class State
   constructor: ->
     @nextID = 0
@@ -15,10 +27,10 @@ class State
     sys.world = this
     return sys
     
-  makeEntity: (name) ->
+  makeEntity: (name = null) ->
     eNum = @nextID
     @nextID += 1
-    e = new Entity eNum
+    e = new Entity(eNum,name)
     @entities.push(e)
     if name
       @keyEntities[name] = e
@@ -39,7 +51,7 @@ class State
     
 
 class Entity
-  constructor: (@eID) ->
+  constructor: (@eID, @name) ->
     @comps = {}
     @dead = false
     

@@ -18,16 +18,21 @@ class Game
     next = @activeState.nextState
     if next
       @activeState = new @states[next]()
-    
+
     @tick()
     @draw()
 
 class GameState extends State
   constructor: ->
     super()
+    @spriteSys = @addSystem(new SpriteSystem())
+    
+    e0 = @makeEntity("Steve")
+    e0.addComps(new Position(0,0,0), new Appearance("steven.png"))
+    @updateEntity(e0)
   
   draw: ->
-    #Do nothing
+    @spriteSys.execute(30)
   
   tick: ->
     
