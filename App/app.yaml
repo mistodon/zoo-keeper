@@ -1,0 +1,19 @@
+application: zoo-keeper
+version: 0-1
+runtime: python
+api_version: 1
+
+handlers:
+
+- url: /data
+  static_dir: data
+
+- url: /scripts
+  static_dir: scripts
+
+- url: /stylesheets
+  static_dir: stylesheets
+
+- url: /.*
+  script: main.py
+  login: required
