@@ -1,5 +1,5 @@
 (function() {
-  var Appearance, Component, Entity, Game, GameState, Position, SpriteSystem, State, System, animFrame, createProgram, initWebGL, loadShader, log;
+  var Appearance, Component, Entity, Game, GameState, Position, SpriteSystem, State, System, all, animFrame, any, createProgram, initWebGL, loadShader, log;
   var __slice = Array.prototype.slice, __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
     for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
     function ctor() { this.constructor = child; }
@@ -54,6 +54,20 @@
     }
     return shaderProg;
   };
+  all = function(bools) {
+    if (bools.length === 0) {
+      return true;
+    } else {
+      return bools[0] && all(bools.slice(1));
+    }
+  };
+  any = function(bools) {
+    if (bools.length === 0) {
+      return false;
+    } else {
+      return bools[0] || any(bools.slice(1));
+    }
+  };
   State = (function() {
     function State() {
       this.nextID = 0;
@@ -71,9 +85,12 @@
     };
     State.prototype.makeEntity = function(name) {
       var e, eNum;
+      if (name == null) {
+        name = null;
+      }
       eNum = this.nextID;
       this.nextID += 1;
-      e = new Entity(eNum);
+      e = new Entity(eNum, name);
       this.entities.push(e);
       if (name) {
         this.keyEntities[name] = e;
@@ -151,8 +168,9 @@
     return State;
   })();
   Entity = (function() {
-    function Entity(eID) {
+    function Entity(eID, name) {
       this.eID = eID;
+      this.name = name;
       this.comps = {};
       this.dead = false;
     }
@@ -231,9 +249,29 @@
   SpriteSystem = (function() {
     __extends(SpriteSystem, System);
     function SpriteSystem() {
+      var gl, vertices;
       SpriteSystem.__super__.constructor.call(this, "Position", "Appearance");
+      gl = window.globals.gl;
+      this.vertBuffer = gl.createBuffer();
+      this.program = createProgram("sprite.vs", "sprite.fs");
+      this.vertPos = gl.getAttribLocation(this.program, "aVertPos");
+      this.colour = gl.getUniformLocation(this.program, "uColour");
+      log(this.vertPos);
+      log(this.colour);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.vertBuffer);
+      vertices = [-0.5, -0.5, 0.0, 0.5, -0.5, 0.0, 0.5, 0.5, 0.0, -0.5, 0.5, 0.0];
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
     }
-    SpriteSystem.prototype.processEntity = function(e, delta) {};
+    SpriteSystem.prototype.processEntity = function(e, delta) {
+      var gl;
+      gl = window.globals.gl;
+      gl.useProgram(this.program);
+      gl.enableVertexAttribArray(this.vertPos);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.vertBuffer);
+      gl.vertexAttribPointer(this.vertPos, 3, gl.Float, false, 0, 0);
+      gl.uniform4f(this.colour, 1.0, 1.0, 1.0, 1.0);
+      return gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    };
     return SpriteSystem;
   })();
   Game = (function() {
@@ -267,11 +305,16 @@
   GameState = (function() {
     __extends(GameState, State);
     function GameState() {
-      var p;
+      var e0;
       GameState.__super__.constructor.call(this);
-      p = createProgram("sprite.vs", "sprite.fs");
+      this.spriteSys = this.addSystem(new SpriteSystem());
+      e0 = this.makeEntity("Steve");
+      e0.addComps(new Position(0, 0, 0), new Appearance("steven.png"));
+      this.updateEntity(e0);
     }
-    GameState.prototype.draw = function() {};
+    GameState.prototype.draw = function() {
+      return this.spriteSys.execute(30);
+    };
     GameState.prototype.tick = function() {};
     return GameState;
   })();
