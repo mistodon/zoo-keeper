@@ -1,6 +1,22 @@
 (function() {
-  var Component, Entity, State, System;
-  var __slice = Array.prototype.slice;
+  var Appearance, Component, Entity, Game, GameState, Position, SpriteSystem, State, System, animFrame, initWebGL, loadShader, log;
+  var __slice = Array.prototype.slice, __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
+    for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
+    function ctor() { this.constructor = child; }
+    ctor.prototype = parent.prototype;
+    child.prototype = new ctor;
+    child.__super__ = parent.prototype;
+    return child;
+  };
+  log = function() {
+    var strings;
+    strings = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+    return console.log.apply(console, strings);
+  };
+  loadShader = function(fname) {
+    var shaderURL;
+    return shaderURL = "/data/shaders/" + fname;
+  };
   State = (function() {
     function State() {
       this.nextID = 0;
@@ -157,4 +173,101 @@
     }
     return Component;
   })();
+  Position = (function() {
+    __extends(Position, Component);
+    function Position(x, y, z) {
+      this.x = x;
+      this.y = y;
+      this.z = z;
+      this.name = "Position";
+    }
+    return Position;
+  })();
+  Appearance = (function() {
+    __extends(Appearance, Component);
+    function Appearance(image) {
+      this.image = image;
+      this.name = "Appearance";
+    }
+    return Appearance;
+  })();
+  SpriteSystem = (function() {
+    __extends(SpriteSystem, System);
+    function SpriteSystem() {
+      SpriteSystem.__super__.constructor.call(this, "Position", "Appearance");
+    }
+    SpriteSystem.prototype.processEntity = function(e, delta) {};
+    return SpriteSystem;
+  })();
+  Game = (function() {
+    function Game() {
+      this.states = {
+        "game": GameState
+      };
+      this.activeState = new GameState();
+    }
+    Game.prototype.tick = function() {
+      this.activeState.cleanUp();
+      return this.activeState.tick(30);
+    };
+    Game.prototype.draw = function() {
+      var gl;
+      gl = window.globals.gl;
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      return this.activeState.draw();
+    };
+    Game.prototype.run = function() {
+      var next;
+      next = this.activeState.nextState;
+      if (next) {
+        this.activeState = new this.states[next]();
+      }
+      this.tick();
+      return this.draw();
+    };
+    return Game;
+  })();
+  GameState = (function() {
+    __extends(GameState, State);
+    function GameState() {
+      GameState.__super__.constructor.call(this);
+      this.frames = 0;
+    }
+    GameState.prototype.draw = function() {};
+    GameState.prototype.tick = function() {
+      return log("Game ticking...");
+    };
+    return GameState;
+  })();
+  animFrame = window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || window.oRequestAnimationFrame || window.msRequestAnimationFrame || null;
+  window.beginGame = function(canvasID) {
+    var canvas, game, mainloop;
+    window.globals = {};
+    canvas = document.getElementById(canvasID);
+    initWebGL(canvas);
+    game = new Game();
+    mainloop = function() {
+      game.run();
+      return animFrame(mainloop);
+    };
+    return animFrame(mainloop);
+  };
+  initWebGL = function(canvas) {
+    var gl;
+    gl = null;
+    try {
+      gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    } catch (error) {
+
+    }
+    if (!gl) {
+      alert("Unable to initialize WebGL.");
+    } else {
+      log("WebGL initialized.");
+    }
+    gl.clearColor(0.3, 0.3, 1.0, 1.0);
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LEQUAL);
+    return window.globals.gl = gl;
+  };
 }).call(this);
