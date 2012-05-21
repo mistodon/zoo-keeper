@@ -1,5 +1,5 @@
 (function() {
-  var Appearance, Component, Entity, Game, GameState, Position, SpriteSystem, State, System, animFrame, initWebGL, loadShader, log;
+  var Appearance, Component, Entity, Game, GameState, Position, SpriteSystem, State, System, animFrame, createProgram, initWebGL, loadShader, log;
   var __slice = Array.prototype.slice, __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
     for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
     function ctor() { this.constructor = child; }
@@ -14,8 +14,45 @@
     return console.log.apply(console, strings);
   };
   loadShader = function(fname) {
-    var shaderURL;
-    return shaderURL = "/data/shaders/" + fname;
+    var ext, gl, req, shader, shaderCode, shaderURL;
+    shaderURL = "/data/shaders/" + fname;
+    req = new XMLHttpRequest();
+    req.open("GET", shaderURL, false);
+    req.send();
+    shaderCode = req.responseText;
+    ext = fname.slice(fname.length - 2);
+    gl = window.globals.gl;
+    if (ext === "vs") {
+      shader = gl.createShader(gl.VERTEX_SHADER);
+    } else {
+      shader = gl.createShader(gl.FRAGMENT_SHADER);
+    }
+    gl.shaderSource(shader, shaderCode);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      log("Shader compilation error: " + gl.getShaderInfoLog(shader));
+      return null;
+    } else {
+      return shader;
+    }
+  };
+  createProgram = function(vertShader, fragShader) {
+    var gl, shaderProg;
+    if (typeof vertShader === "string") {
+      vertShader = loadShader(vertShader);
+    }
+    if (typeof fragShader === "string") {
+      fragShader = loadShader(fragShader);
+    }
+    gl = window.globals.gl;
+    shaderProg = gl.createProgram();
+    gl.attachShader(shaderProg, vertShader);
+    gl.attachShader(shaderProg, fragShader);
+    gl.linkProgram(shaderProg);
+    if (!gl.getProgramParameter(shaderProg, gl.LINK_STATUS)) {
+      log("Error linking shader program.");
+    }
+    return shaderProg;
   };
   State = (function() {
     function State() {
@@ -230,13 +267,12 @@
   GameState = (function() {
     __extends(GameState, State);
     function GameState() {
+      var p;
       GameState.__super__.constructor.call(this);
-      this.frames = 0;
+      p = createProgram("sprite.vs", "sprite.fs");
     }
     GameState.prototype.draw = function() {};
-    GameState.prototype.tick = function() {
-      return log("Game ticking...");
-    };
+    GameState.prototype.tick = function() {};
     return GameState;
   })();
   animFrame = window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || window.oRequestAnimationFrame || window.msRequestAnimationFrame || null;
