@@ -4,7 +4,7 @@ from google.appengine.ext.webapp import util
 
 from handler import ZooHandler
 
-admins = ["***redacted.email@redacted.nope***","poachedbaconcake@gmail.com"]
+admins = ["pirh.badger@gmail.com","poachedbaconcake@gmail.com"]
 
 class MainHandler(ZooHandler):
     def get(self):

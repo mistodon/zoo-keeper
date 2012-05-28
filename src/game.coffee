@@ -11,6 +11,7 @@ class Game
     
   draw: ->
     gl = window.globals.gl
+    gl.viewport(0, 0, 800, 480)
     gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT)
     @activeState.draw()
     
@@ -29,7 +30,7 @@ class GameState extends State
     
     e0 = @makeEntity("Steve")
     e0.addComps(new Position(0,0,0), new Appearance("steven.png"))
-    @updateEntity(e0)
+    e0.update()
   
   draw: ->
     @spriteSys.execute(30)
