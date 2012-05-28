@@ -1,5 +1,5 @@
 (function() {
-  var Appearance, Component, Entity, Game, GameState, Position, SpriteSystem, State, System, all, animFrame, any, createProgram, initWebGL, loadShader, log;
+  var Appearance, Component, Entity, Game, GameState, GroupSystem, Position, SpriteSystem, State, System, all, animFrame, any, createProgram, initWebGL, loadShader, log;
   var __slice = Array.prototype.slice, __hasProp = Object.prototype.hasOwnProperty, __extends = function(child, parent) {
     for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; }
     function ctor() { this.constructor = child; }
@@ -72,8 +72,10 @@
     function State() {
       this.nextID = 0;
       this.entities = [];
-      this.systems = [];
       this.keyEntities = {};
+      this.updateList = {};
+      this.systems = [];
+      this.events = [];
       this.nextState = null;
     }
     State.prototype.draw = function(context) {};
@@ -90,38 +92,12 @@
       }
       eNum = this.nextID;
       this.nextID += 1;
-      e = new Entity(eNum, name);
+      e = new Entity(this, eNum, name);
       this.entities.push(e);
       if (name) {
         this.keyEntities[name] = e;
       }
       return e;
-    };
-    State.prototype.updateEntity = function(e) {
-      var sys, _i, _len, _ref, _results;
-      _ref = this.systems;
-      _results = [];
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        sys = _ref[_i];
-        _results.push(this.updateSystemFor(sys, e));
-      }
-      return _results;
-    };
-    State.prototype.updateSystemFor = function(sys, e) {
-      var c, matches;
-      matches = (function() {
-        var _i, _len, _ref, _results;
-        _ref = sys.comps;
-        _results = [];
-        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-          c = _ref[_i];
-          _results.push(e.hasComp(c));
-        }
-        return _results;
-      })();
-      if (all(matches)) {
-        return sys.addEntity(e);
-      }
     };
     State.prototype.cleanUp = function() {
       var deadList, e, sys, _i, _len, _results;
@@ -165,17 +141,35 @@
       }
       return _results;
     };
+    State.prototype.addEvent = function(event) {
+      return this.events.push(event);
+    };
+    State.prototype.clearEvents = function() {
+      return this.events = [];
+    };
+    State.prototype.updateAll = function() {
+      var e, id, _ref, _results;
+      _ref = this.updateList;
+      _results = [];
+      for (id in _ref) {
+        e = _ref[id];
+        _results.push(e.update);
+      }
+      return _results;
+    };
     return State;
   })();
   Entity = (function() {
-    function Entity(eID, name) {
+    function Entity(world, eID, name) {
+      this.world = world;
       this.eID = eID;
       this.name = name;
       this.comps = {};
       this.dead = false;
     }
     Entity.prototype.addComp = function(comp) {
-      return this.comps[comp.name] = comp;
+      this.comps[comp.name] = comp;
+      return this.world.updateList[this.eID] = this;
     };
     Entity.prototype.addComps = function() {
       var c, comps, _i, _len, _results;
@@ -192,6 +186,26 @@
     };
     Entity.prototype.hasComp = function(compName) {
       return this.comps.hasOwnProperty(compName);
+    };
+    Entity.prototype.update = function() {
+      var c, sys, _i, _len, _ref;
+      _ref = this.world.systems;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        sys = _ref[_i];
+        if (all((function() {
+          var _j, _len2, _ref2, _results;
+          _ref2 = sys.comps;
+          _results = [];
+          for (_j = 0, _len2 = _ref2.length; _j < _len2; _j++) {
+            c = _ref2[_j];
+            _results.push(this.hasComp(c));
+          }
+          return _results;
+        }).call(this))) {
+          sys.addEntity(this);
+        }
+      }
+      return delete this.world.updateList[this.eID];
     };
     return Entity;
   })();
@@ -221,6 +235,55 @@
       return delete this.entities[e.eID];
     };
     return System;
+  })();
+  GroupSystem = (function() {
+    __extends(GroupSystem, System);
+    function GroupSystem() {
+      var requiredComps;
+      requiredComps = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+      this.world = null;
+      this.groups = {};
+      this.comps = requiredComps;
+    }
+    GroupSystem.prototype.execute = function(delta) {
+      var e, group, id, _i, _len, _ref, _results;
+      _ref = this.groups;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        group = _ref[_i];
+        _results.push((function() {
+          var _ref2, _results2;
+          _ref2 = this.entities;
+          _results2 = [];
+          for (id in _ref2) {
+            e = _ref2[id];
+            _results2.push(this.processEntity(e, group, delta));
+          }
+          return _results2;
+        }).call(this));
+      }
+      return _results;
+    };
+    GroupSystem.prototype.processEntity = function(e, group, delta) {};
+    GroupSystem.prototype.getGroup = function(entity) {
+      return "entities";
+    };
+    GroupSystem.prototype.addEntity = function(e) {
+      var group;
+      group = getGroup(e);
+      if (!this.groups[group]) {
+        this.groups[group] = {};
+      }
+      return this.groups[group][e.eID] = e;
+    };
+    GroupSystem.prototype.forgetEntity = function(e) {
+      var group;
+      group = getGroup(e);
+      if (this.groups[group]) {
+        return delete this.groups[group][e.eID];
+      }
+    };
+    return GroupSystem;
   })();
   Component = (function() {
     function Component() {
@@ -256,17 +319,15 @@
       this.program = createProgram("sprite.vs", "sprite.fs");
       this.vertPos = gl.getAttribLocation(this.program, "aVertPos");
       this.colour = gl.getUniformLocation(this.program, "uColour");
-      log(this.vertPos);
-      log(this.colour);
+      gl.enableVertexAttribArray(this.vertPos);
       gl.bindBuffer(gl.ARRAY_BUFFER, this.vertBuffer);
-      vertices = [-0.5, -0.5, 0.0, 0.5, -0.5, 0.0, 0.5, 0.5, 0.0, -0.5, 0.5, 0.0];
+      vertices = [0.5, 0.5, -1.0, -0.5, 0.5, -1.0, 0.5, -0.5, -1.0, -0.5, -0.5, -1.0];
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
     }
     SpriteSystem.prototype.processEntity = function(e, delta) {
       var gl;
       gl = window.globals.gl;
       gl.useProgram(this.program);
-      gl.enableVertexAttribArray(this.vertPos);
       gl.bindBuffer(gl.ARRAY_BUFFER, this.vertBuffer);
       gl.vertexAttribPointer(this.vertPos, 3, gl.Float, false, 0, 0);
       gl.uniform4f(this.colour, 1.0, 1.0, 1.0, 1.0);
@@ -288,6 +349,7 @@
     Game.prototype.draw = function() {
       var gl;
       gl = window.globals.gl;
+      gl.viewport(0, 0, 800, 480);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       return this.activeState.draw();
     };
@@ -310,7 +372,7 @@
       this.spriteSys = this.addSystem(new SpriteSystem());
       e0 = this.makeEntity("Steve");
       e0.addComps(new Position(0, 0, 0), new Appearance("steven.png"));
-      this.updateEntity(e0);
+      e0.update();
     }
     GameState.prototype.draw = function() {
       return this.spriteSys.execute(30);
